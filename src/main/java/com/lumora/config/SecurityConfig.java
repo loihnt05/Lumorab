@@ -3,9 +3,8 @@ package com.lumora.config;
 import com.lumora.identity.security.LocalUserAuthenticationConverter;
 import com.lumora.identity.security.SecurityErrorHandler;
 import jakarta.servlet.DispatcherType;
-import java.util.Arrays;
 import java.util.List;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -20,6 +19,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 @Configuration
 @EnableMethodSecurity
+@EnableConfigurationProperties(LumoraCorsProperties.class)
 public class SecurityConfig {
   @Bean
   SecurityFilterChain securityFilterChain(
@@ -64,11 +64,10 @@ public class SecurityConfig {
   }
 
   @Bean
-  CorsConfigurationSource corsConfigurationSource(
-      @Value("${app.cors.allowed-origins}") String allowedOrigins) {
+  CorsConfigurationSource corsConfigurationSource(LumoraCorsProperties properties) {
     CorsConfiguration config = new CorsConfiguration();
     config.setAllowedOrigins(
-        Arrays.stream(allowedOrigins.split(","))
+        properties.allowedOrigins().stream()
             .map(String::trim)
             .filter(value -> !value.isEmpty())
             .toList());

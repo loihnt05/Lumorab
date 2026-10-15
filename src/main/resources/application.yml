@@ -23,11 +23,12 @@ spring:
     clean-disabled: true
   jackson:
     time-zone: UTC
+  web:
+    error:
+      include-message: never
+      include-stacktrace: never
 server:
   port: ${SERVER_PORT:8080}
-  error:
-    include-message: never
-    include-stacktrace: never
 app:
   clerk:
     issuer: ${CLERK_ISSUER:}
