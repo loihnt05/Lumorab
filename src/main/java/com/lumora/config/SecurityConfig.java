@@ -1,19 +1,15 @@
 package com.lumora.config;
 
-import com.lumora.common.web.ApiError;
-import com.lumora.common.web.RequestIdFilter;
+import com.lumora.identity.security.LocalUserAuthenticationConverter;
+import com.lumora.identity.security.SecurityErrorHandler;
 import jakarta.servlet.DispatcherType;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
-import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
-import org.springframework.http.MediaType;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -21,12 +17,13 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-import tools.jackson.databind.json.JsonMapper;
 
 @Configuration
+@EnableMethodSecurity
 public class SecurityConfig {
   @Bean
-  SecurityFilterChain securityFilterChain(HttpSecurity http, JsonMapper mapper) {
+  SecurityFilterChain securityFilterChain(
+      HttpSecurity http, LocalUserAuthenticationConverter converter, SecurityErrorHandler errors) {
     return http.csrf(AbstractHttpConfigurer::disable)
         .cors(cors -> {})
         .sessionManagement(
@@ -47,29 +44,22 @@ public class SecurityConfig {
                         "/v3/api-docs",
                         "/v3/api-docs/**")
                     .permitAll()
+                    .requestMatchers("/api/admin/**")
+                    .hasRole("ADMIN")
+                    .requestMatchers("/api/manager/**")
+                    .hasAnyRole("MANAGER", "ADMIN")
+                    .requestMatchers("/api/me")
+                    .authenticated()
                     .anyRequest()
                     .denyAll())
+        .oauth2ResourceServer(
+            resource ->
+                resource
+                    .jwt(jwt -> jwt.jwtAuthenticationConverter(converter))
+                    .authenticationEntryPoint(errors)
+                    .accessDeniedHandler(errors))
         .exceptionHandling(
-            errors ->
-                errors
-                    .authenticationEntryPoint(
-                        (request, response, ex) ->
-                            writeError(
-                                mapper,
-                                request,
-                                response,
-                                401,
-                                "UNAUTHORIZED",
-                                "Authentication is required."))
-                    .accessDeniedHandler(
-                        (request, response, ex) ->
-                            writeError(
-                                mapper,
-                                request,
-                                response,
-                                403,
-                                "FORBIDDEN",
-                                "You do not have permission to access this resource.")))
+            handler -> handler.authenticationEntryPoint(errors).accessDeniedHandler(errors))
         .build();
   }
 
@@ -90,21 +80,5 @@ public class SecurityConfig {
     UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
     source.registerCorsConfiguration("/**", config);
     return source;
-  }
-
-  private void writeError(
-      JsonMapper mapper,
-      HttpServletRequest request,
-      HttpServletResponse response,
-      int status,
-      String code,
-      String message)
-      throws IOException {
-    response.setStatus(status);
-    response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-    mapper.writeValue(
-        response.getOutputStream(),
-        new ApiError(
-            code, message, Map.of(), (String) request.getAttribute(RequestIdFilter.ATTRIBUTE)));
   }
 }

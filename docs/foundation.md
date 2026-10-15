@@ -49,6 +49,8 @@ Transport-level CORS rejections are handled by Spring before MVC error handling.
 - Hibernate uses `ddl-auto: validate`; Flyway owns DDL.
 - Use UUID primary keys, snake_case names and TIMESTAMPTZ audit columns.
 - JPA entities extend `AuditableEntity`; Spring Data maintains UTC `Instant` fields.
+- Entities use Lombok `@Getter` and `@Builder`; keep the JPA no-argument constructor
+  `protected` and do not expose public setters.
 - For SQL writers, attach a BEFORE UPDATE trigger calling `set_updated_at()`.
 - Migration V1 defines the audit function; business tables start in later stages.
 - Do not use destructive Flyway clean against shared data (disabled by default).

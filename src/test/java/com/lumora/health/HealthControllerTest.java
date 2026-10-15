@@ -8,22 +8,32 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.lumora.common.web.GlobalExceptionHandler;
 import com.lumora.common.web.RequestIdFilter;
 import com.lumora.config.SecurityConfig;
+import com.lumora.identity.security.LocalUserAuthenticationConverter;
+import com.lumora.identity.security.SecurityErrorHandler;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(
     value = HealthController.class,
     properties = "app.cors.allowed-origins=http://localhost:3000")
-@Import({SecurityConfig.class, GlobalExceptionHandler.class, RequestIdFilter.class})
+@Import({
+  SecurityConfig.class,
+  GlobalExceptionHandler.class,
+  RequestIdFilter.class,
+  SecurityErrorHandler.class
+})
 class HealthControllerTest {
   @Autowired MockMvc mvc;
   @MockitoBean JdbcTemplate jdbc;
+  @MockitoBean JwtDecoder jwtDecoder;
+  @MockitoBean LocalUserAuthenticationConverter converter;
 
   @Test
   void healthChecksDatabaseAndPropagatesRequestId() throws Exception {
