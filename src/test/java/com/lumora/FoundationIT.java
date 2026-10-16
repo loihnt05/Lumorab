@@ -2,6 +2,7 @@ package com.lumora;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.lumora.support.TestTokens;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -14,7 +15,9 @@ import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 // Explicit opt-in: ./mvnw -Pintegration verify, with the local PostgreSQL running.
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@SpringBootTest(
+    webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+    properties = "app.clerk.issuer=")
 class FoundationIT {
   @LocalServerPort int port;
   @Autowired Flyway flyway;
@@ -28,6 +31,25 @@ class FoundationIT {
             jdbc.queryForObject(
                 "SELECT count(*) FROM pg_proc WHERE proname = 'set_updated_at'", Integer.class))
         .isPositive();
+  }
+
+  @Test
+  void unconfiguredClerkKeepsProtectedApiClosed() throws Exception {
+    try (HttpClient client = HttpClient.newHttpClient()) {
+      var response =
+          client.send(
+              HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/me"))
+                  .header("Authorization", "Bearer " + TestTokens.token("user_unconfigured"))
+                  .build(),
+              HttpResponse.BodyHandlers.ofString());
+      assertThat(response.statusCode()).isEqualTo(401);
+      assertThat(response.body()).contains("\"code\":\"UNAUTHORIZED\"");
+      assertThat(
+              jdbc.queryForObject(
+                  "SELECT count(*) FROM users WHERE clerk_user_id = 'user_unconfigured'",
+                  Integer.class))
+          .isZero();
+    }
   }
 
   @Test

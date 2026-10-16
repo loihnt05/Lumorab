@@ -9,15 +9,38 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.server.ResponseStatusException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
   private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+  @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+  ResponseEntity<ApiError> invalidParameter(
+      MethodArgumentTypeMismatchException exception, HttpServletRequest request) {
+    return error(
+        HttpStatus.BAD_REQUEST,
+        "BAD_REQUEST",
+        "A request parameter has an invalid format.",
+        Map.of(exception.getName(), "Invalid format."),
+        request);
+  }
+
+  @ExceptionHandler(AccessDeniedException.class)
+  ResponseEntity<ApiError> forbidden(AccessDeniedException exception, HttpServletRequest request) {
+    return error(
+        HttpStatus.FORBIDDEN,
+        "FORBIDDEN",
+        "You do not have permission to access this resource.",
+        Map.of(),
+        request);
+  }
 
   @ExceptionHandler(HttpMessageNotReadableException.class)
   ResponseEntity<ApiError> malformedBody(
