@@ -44,6 +44,16 @@ public class SecurityConfig {
                         "/v3/api-docs",
                         "/v3/api-docs/**")
                     .permitAll()
+                    .requestMatchers(
+                        HttpMethod.GET,
+                        "/api/properties",
+                        "/api/properties/*",
+                        "/api/properties/*/room-types",
+                        "/api/properties/*/room-types/*",
+                        "/api/properties/*/rooms",
+                        "/api/properties/*/rooms/*",
+                        "/api/amenities")
+                    .permitAll()
                     .requestMatchers("/api/admin/**")
                     .hasRole("ADMIN")
                     .requestMatchers("/api/manager/**")

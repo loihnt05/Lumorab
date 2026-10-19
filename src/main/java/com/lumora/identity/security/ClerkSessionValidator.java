@@ -21,7 +21,10 @@ public final class ClerkSessionValidator implements OAuth2TokenValidator<Jwt> {
         || !jwt.getExpiresAt().isAfter(jwt.getIssuedAt())
         || jwt.getIssuedAt().isAfter(Instant.now().plusSeconds(60))) return invalid();
     Object party = jwt.getClaims().get("azp");
-    if (!(party instanceof String) || !properties.authorizedParties().contains(party))
+    // Clerk can omit azp when a session token is issued without an Origin header
+    // (for example, through its Backend API). Check it strictly whenever present.
+    if (party != null
+        && (!(party instanceof String) || !properties.authorizedParties().contains(party)))
       return invalid();
     Object sessionStatus = jwt.getClaims().get("sts");
     if (sessionStatus != null && !"active".equals(sessionStatus)) return invalid();

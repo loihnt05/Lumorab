@@ -30,6 +30,11 @@ spring:
 server:
   port: ${SERVER_PORT:8080}
 app:
+  room-codes:
+    enabled: ${ROOM_CODES_ENABLED:true}
+    zone: ${ROOM_CODES_ZONE:Asia/Ho_Chi_Minh}
+    cron: ${ROOM_CODES_CRON:0 0 0 * * *}
+    length: ${ROOM_CODES_LENGTH:6}
   clerk:
     issuer: ${CLERK_ISSUER:}
     authorized-parties: ${CLERK_AUTHORIZED_PARTIES:http://localhost:3000}

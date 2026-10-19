@@ -1,6 +1,6 @@
 # lumorab
 
-Lumora API with Stage 0 foundation and Stage 1 backend identity/authorization.
+Lumora API with Stage 0 foundation, Stage 1 identity/authorization and Stage 2 backend inventory.
 Uses Java 21, Spring Boot, Spring MVC, Validation, OAuth2 Resource Server, Security,
 JPA, PostgreSQL, Flyway, Actuator, and springdoc OpenAPI. Requires Java 21 and
 Docker with Compose for the local database. The Maven wrapper is included.
@@ -41,7 +41,8 @@ Normal `verify` checks formatting, compiles, runs API/security/error tests and
 packages an executable JAR. These tests need no database. The explicit integration
 profile starts the complete application against your configured development
 database, validates/reruns migrations, and tests health/OpenAPI, signed JWTs,
-concurrent user creation, database roles, and property permissions over real HTTP.
+concurrent user creation, database roles, property permissions, inventory CRUD,
+metadata ownership, admin-only blocking, and idempotent room-code rotation over real HTTP.
 RSA signing keys and the trusted test decoder exist only under `src/test`.
 Use a disposable test database if you do not want migrations applied to local data.
 
@@ -88,7 +89,9 @@ com.lumora
   identity/             Local users, profile synchronization, /api/me and admin user read
     security/           Clerk JWT verification, principal and database-backed roles
   authorization/        Manager/property assignments and protected management queries
-  property/             Minimal property identity; inventory/CRUD follow in Stage 2
+  property/             Property catalog and admin CRUD
+  inventory/            Scoped room types/rooms, blocking, image and amenity metadata
+  accesscode/           Admin code retrieval and idempotent daily rotation
 src/main/resources/db/migration/  Immutable versioned Flyway migrations
 docs/                   API contract and development conventions
 ```
@@ -100,3 +103,6 @@ JPA entities use Lombok-generated getters and builders, retain a protected no-ar
 constructor for Hibernate, and do not expose public setters.
 See `docs/foundation.md` for migration rules and `docs/stage-1-identity.md` for the
 implemented backend scope and remaining external integration steps. FE is unchanged.
+
+See [Stage 2 inventory](docs/stage-2-inventory.md) for API bodies, permissions,
+soft-deletion rules, room-code scheduling and integration coverage. Stage 2 is backend-only.
