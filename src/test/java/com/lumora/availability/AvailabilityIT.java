@@ -25,7 +25,11 @@ import tools.jackson.databind.json.JsonMapper;
 
 @SpringBootTest(
     webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-    properties = {"app.clerk.issuer=", "app.room-codes.enabled=false"})
+    properties = {
+      "app.clerk.issuer=",
+      "app.room-codes.enabled=false",
+      "app.booking.expiry-enabled=false"
+    })
 @Import(AvailabilityIT.TimeConfig.class)
 class AvailabilityIT {
   private static final Instant NOW = Instant.parse("2026-10-19T10:00:00Z");
@@ -196,12 +200,7 @@ class AvailabilityIT {
     var results = get(searchPath(), 200).get("rooms");
     assertThat(results.size()).isEqualTo(1);
     assertThat(results.get(0).get("room").get("id").asText()).isEqualTo(secondRoom.toString());
-    jdbc.update(
-        "INSERT INTO booking_rooms(id,booking_id,room_id,property_id) VALUES (?,?,?,?)",
-        UUID.randomUUID(),
-        booking,
-        secondRoom,
-        property);
+    bookingRoom(booking, secondRoom, property);
     assertThat(get(searchPath(), 200).get("rooms").isEmpty()).isTrue();
   }
 
@@ -303,23 +302,9 @@ class AvailabilityIT {
           otherRoom,
           otherProperty,
           otherType);
-      assertThatThrownBy(
-              () ->
-                  jdbc.update(
-                      "INSERT INTO booking_rooms(id,booking_id,room_id,property_id) VALUES (?,?,?,?)",
-                      UUID.randomUUID(),
-                      booking,
-                      otherRoom,
-                      property))
+      assertThatThrownBy(() -> bookingRoom(booking, otherRoom, property))
           .isInstanceOf(DataIntegrityViolationException.class);
-      assertThatThrownBy(
-              () ->
-                  jdbc.update(
-                      "INSERT INTO booking_rooms(id,booking_id,room_id,property_id) VALUES (?,?,?,?)",
-                      UUID.randomUUID(),
-                      booking,
-                      otherRoom,
-                      otherProperty))
+      assertThatThrownBy(() -> bookingRoom(booking, otherRoom, otherProperty))
           .isInstanceOf(DataIntegrityViolationException.class);
     } finally {
       jdbc.update("DELETE FROM rooms WHERE property_id=?", otherProperty);
@@ -341,21 +326,33 @@ class AvailabilityIT {
   private UUID booking(BookingStatus status, LocalDate start, LocalDate end, Instant expiry) {
     UUID id = UUID.randomUUID();
     jdbc.update(
-        "INSERT INTO bookings(id,user_id,property_id,check_in_date,check_out_date,status,expires_at) VALUES (?,?,?,?,?,?,?)",
+        "INSERT INTO bookings(id,user_id,property_id,check_in_date,check_out_date,status,expires_at,booking_code,guest_count,subtotal,total_amount) VALUES (?,?,?,?,?,?,?,?,2,0,0)",
         id,
         user,
         property,
         start,
         end,
         status.name(),
-        expiry == null ? null : Timestamp.from(expiry));
-    jdbc.update(
-        "INSERT INTO booking_rooms(id,booking_id,room_id,property_id) VALUES (?,?,?,?)",
-        UUID.randomUUID(),
-        id,
-        room,
-        property);
+        expiry == null ? null : Timestamp.from(expiry),
+        "STAGE3-" + id);
+    bookingRoom(id, room, property);
     return id;
+  }
+
+  private void bookingRoom(UUID bookingId, UUID roomId, UUID propertyId) {
+    jdbc.update(
+        """
+        INSERT INTO booking_rooms(id,booking_id,room_id,property_id,room_type_id,room_number,
+          room_name,price_per_night,number_of_nights,room_total)
+        SELECT ?,b.id,r.id,?,r.room_type_id,r.room_number,r.name,t.base_price,
+          b.check_out_date-b.check_in_date,t.base_price*(b.check_out_date-b.check_in_date)
+        FROM bookings b,rooms r JOIN room_types t ON t.id=r.room_type_id
+        WHERE b.id=? AND r.id=?
+        """,
+        UUID.randomUUID(),
+        propertyId,
+        bookingId,
+        roomId);
   }
 
   private String searchPath() {

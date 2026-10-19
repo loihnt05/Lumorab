@@ -1,10 +1,9 @@
 package com.lumora.catalog;
 
 import com.lumora.availability.AvailabilityRequest;
-import com.lumora.booking.BookingStatus;
+import com.lumora.booking.BookingInventoryPolicy;
 import com.lumora.inventory.InventoryViews.Amenity;
 import com.lumora.inventory.InventoryViews.Image;
-import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.*;
 import lombok.RequiredArgsConstructor;
@@ -45,20 +44,13 @@ public class PublicCatalogRepository {
         AND r.property_id=:propertyId AND t.max_guests>=:guests
         AND NOT EXISTS (
           SELECT 1 FROM booking_rooms br JOIN bookings b ON b.id=br.booking_id
-          WHERE br.room_id=r.id
-            AND b.check_in_date < :checkOut AND b.check_out_date > :checkIn
-            AND (b.status IN (:occupiedStatuses)
-                 OR (b.status=:pendingStatus AND b.expires_at > :now))
-        )
-        """,
-        new MapSqlParameterSource()
+          WHERE br.room_id=r.id AND
+        """
+            + BookingInventoryPolicy.OVERLAPPING_OCCUPANCY
+            + ")",
+        BookingInventoryPolicy.parameters(request.checkIn(), request.checkOut(), now)
             .addValue("propertyId", request.propertyId())
-            .addValue("guests", request.guests())
-            .addValue("checkIn", request.checkIn())
-            .addValue("checkOut", request.checkOut())
-            .addValue("occupiedStatuses", BookingStatus.occupiedStatuses())
-            .addValue("pendingStatus", BookingStatus.PENDING_PAYMENT.name())
-            .addValue("now", Timestamp.from(now)));
+            .addValue("guests", request.guests()));
   }
 
   private List<PublicViews.Room> query(String filter, MapSqlParameterSource parameters) {

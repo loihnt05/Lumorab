@@ -65,6 +65,10 @@ public class SecurityConfig {
                     .hasAnyRole("MANAGER", "ADMIN")
                     .requestMatchers("/api/me")
                     .authenticated()
+                    .requestMatchers(HttpMethod.POST, "/api/bookings")
+                    .hasRole("USER")
+                    .requestMatchers(HttpMethod.GET, "/api/me/bookings", "/api/me/bookings/*")
+                    .authenticated()
                     .anyRequest()
                     .denyAll())
         .oauth2ResourceServer(

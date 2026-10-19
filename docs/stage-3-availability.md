@@ -71,7 +71,7 @@ and `max_guests >= guests`. An overlapping stay occupies its physical rooms when
 the booking is CONFIRMED or CHECKED_IN, or PENDING_PAYMENT with `expires_at > now`.
 EXPIRED, CANCELLED, CHECKED_OUT and COMPLETED release inventory. The list of
 unconditionally occupying statuses is centralized in `BookingStatus`; the pending
-expiry predicate exists once in `PublicCatalogRepository.available`.
+expiry predicate is shared by search and Stage 4 writes through `BookingInventoryPolicy`.
 
 Overlap is exactly `existing.check_in_date < requested.checkOut AND
 existing.check_out_date > requested.checkIn`. Adjacent stays are allowed. The

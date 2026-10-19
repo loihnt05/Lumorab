@@ -1,7 +1,7 @@
 # lumorab
 
 Lumora API with Stage 0 foundation, Stage 1 identity/authorization, Stage 2 inventory,
-and Stage 3 public catalog, availability and pricing.
+Stage 3 public catalog/availability/pricing, and Stage 4 booking core.
 Uses Java 21, Spring Boot, Spring MVC, Validation, OAuth2 Resource Server, Security,
 JPA, PostgreSQL, Flyway, Actuator, and springdoc OpenAPI. Requires Java 21 and
 Docker with Compose for the local database. The Maven wrapper is included.
@@ -44,7 +44,8 @@ profile starts the complete application against your configured development
 database, validates/reruns migrations, and tests health/OpenAPI, signed JWTs,
 concurrent user creation, database roles, property permissions, inventory CRUD,
 metadata ownership, admin-only blocking, idempotent room-code rotation, public
-catalogs, date overlaps, hold expiry and server-side pricing over real HTTP.
+catalogs, date overlaps, booking holds/expiry, concurrent booking protection,
+price snapshots, guest history and scoped operations reads over real HTTP.
 RSA signing keys and the trusted test decoder exist only under `src/test`.
 Use a disposable test database if you do not want migrations applied to local data.
 
@@ -97,7 +98,7 @@ com.lumora
   catalog/              Public DTOs, catalog routes and batched room queries
   availability/         Date/guest validation and booking conflict search
   pricing/              Reusable base nightly price calculator
-  booking/              Inventory status semantics; booking writes follow in Stage 4
+  booking/              Transactional booking, snapshots, hold/expiry and scoped history
 src/main/resources/db/migration/  Immutable versioned Flyway migrations
 docs/                   API contract and development conventions
 ```
@@ -116,3 +117,7 @@ soft-deletion rules, room-code scheduling and integration coverage. Stage 2 is b
 See [Stage 3 availability](docs/stage-3-availability.md) for public API contracts,
 overlap/hold rules, VND quotes and the V5 booking schema foundation. Stage 3 is
 backend-only; public search UI remains deferred. Search does not reserve rooms.
+
+See [Stage 4 booking core](docs/stage-4-booking-core.md) for create/history/manager
+APIs, transaction lock ordering, expiry settings and the V6 migration/backfill.
+Payment HTTP flows follow in Stage 5. Stage 4 is backend-only; no FE build is needed.
