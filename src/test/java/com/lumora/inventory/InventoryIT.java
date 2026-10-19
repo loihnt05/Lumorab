@@ -101,6 +101,14 @@ class InventoryIT {
     var detail = expect(send("GET", "/api/properties/" + property, null, null), 200);
     assertThat(detail.get("checkInTime").asText()).startsWith("14:00");
     String slug = detail.get("slug").asText();
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT check_in_time FROM properties WHERE id=?", LocalTime.class, property))
+        .isEqualTo(LocalTime.of(14, 0));
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT check_out_time FROM properties WHERE id=?", LocalTime.class, property))
+        .isEqualTo(LocalTime.NOON);
     assertThat(expect(send("GET", "/api/properties/" + slug, null, null), 200).get("id").asText())
         .isEqualTo(property.toString());
     expect(send("POST", "/api/admin/properties", manager, propertyBody("forbidden")), 403);

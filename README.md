@@ -1,6 +1,7 @@
 # lumorab
 
-Lumora API with Stage 0 foundation, Stage 1 identity/authorization and Stage 2 backend inventory.
+Lumora API with Stage 0 foundation, Stage 1 identity/authorization, Stage 2 inventory,
+and Stage 3 public catalog, availability and pricing.
 Uses Java 21, Spring Boot, Spring MVC, Validation, OAuth2 Resource Server, Security,
 JPA, PostgreSQL, Flyway, Actuator, and springdoc OpenAPI. Requires Java 21 and
 Docker with Compose for the local database. The Maven wrapper is included.
@@ -42,7 +43,8 @@ packages an executable JAR. These tests need no database. The explicit integrati
 profile starts the complete application against your configured development
 database, validates/reruns migrations, and tests health/OpenAPI, signed JWTs,
 concurrent user creation, database roles, property permissions, inventory CRUD,
-metadata ownership, admin-only blocking, and idempotent room-code rotation over real HTTP.
+metadata ownership, admin-only blocking, idempotent room-code rotation, public
+catalogs, date overlaps, hold expiry and server-side pricing over real HTTP.
 RSA signing keys and the trusted test decoder exist only under `src/test`.
 Use a disposable test database if you do not want migrations applied to local data.
 
@@ -64,7 +66,7 @@ No database passwords are embedded in application source/config. Every API error
 uses `{ code, message, details, requestId }`; the ID is also returned in
 `X-Request-Id`. Health returns HTTP 503 when the database is unavailable.
 
-Security permits anonymous GET health and documentation endpoints. `/api/me`
+Security permits anonymous GET health, documentation, catalog and availability endpoints. `/api/me`
 requires a verified Clerk session. Admin routes require the local ADMIN role;
 manager routes require MANAGER/ADMIN and property-scoped service checks. Unknown
 routes remain denied. Role/status are reloaded from PostgreSQL on each authenticated
@@ -92,6 +94,10 @@ com.lumora
   property/             Property catalog and admin CRUD
   inventory/            Scoped room types/rooms, blocking, image and amenity metadata
   accesscode/           Admin code retrieval and idempotent daily rotation
+  catalog/              Public DTOs, catalog routes and batched room queries
+  availability/         Date/guest validation and booking conflict search
+  pricing/              Reusable base nightly price calculator
+  booking/              Inventory status semantics; booking writes follow in Stage 4
 src/main/resources/db/migration/  Immutable versioned Flyway migrations
 docs/                   API contract and development conventions
 ```
@@ -106,3 +112,7 @@ implemented backend scope and remaining external integration steps. FE is unchan
 
 See [Stage 2 inventory](docs/stage-2-inventory.md) for API bodies, permissions,
 soft-deletion rules, room-code scheduling and integration coverage. Stage 2 is backend-only.
+
+See [Stage 3 availability](docs/stage-3-availability.md) for public API contracts,
+overlap/hold rules, VND quotes and the V5 booking schema foundation. Stage 3 is
+backend-only; public search UI remains deferred. Search does not reserve rooms.

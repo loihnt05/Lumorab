@@ -52,6 +52,11 @@ public class SecurityConfig {
                         "/api/properties/*/room-types/*",
                         "/api/properties/*/rooms",
                         "/api/properties/*/rooms/*",
+                        "/api/public/properties",
+                        "/api/public/properties/*",
+                        "/api/public/properties/*/rooms",
+                        "/api/public/rooms/*",
+                        "/api/public/availability",
                         "/api/amenities")
                     .permitAll()
                     .requestMatchers("/api/admin/**")

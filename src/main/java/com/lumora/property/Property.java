@@ -8,6 +8,8 @@ import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "properties")
@@ -39,9 +41,11 @@ public class Property extends AuditableEntity {
   private BigDecimal longitude;
 
   @Column(nullable = false)
+  @JdbcTypeCode(SqlTypes.LOCAL_TIME)
   private LocalTime checkInTime = LocalTime.of(14, 0);
 
   @Column(nullable = false)
+  @JdbcTypeCode(SqlTypes.LOCAL_TIME)
   private LocalTime checkOutTime = LocalTime.NOON;
 
   public void update(PropertyRequest request) {
