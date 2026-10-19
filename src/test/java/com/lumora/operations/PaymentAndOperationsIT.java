@@ -141,6 +141,8 @@ class PaymentAndOperationsIT {
       jdbc.update("DELETE FROM audit_logs WHERE actor_user_id=?", a.id());
       jdbc.update("DELETE FROM users WHERE id=?", a.id());
     }
+    jdbc.update("DELETE FROM users WHERE clerk_user_id LIKE 'user_stage6_%'");
+    actors.clear();
   }
 
   @Test
@@ -317,7 +319,11 @@ class PaymentAndOperationsIT {
     createBooking(otherUser, secondRoom, property, IN, OUT); // Remains PENDING_PAYMENT
 
     // P6.3 Admin user list, role promotion, status disable, and last-admin protection
-    var usersPage = expect(send("GET", "/api/admin/users?q=guest1@lumora.test", admin, null), 200);
+    var usersPage =
+        expect(
+            send(
+                "GET", "/api/admin/users?q=" + user.subject() + ".guest1@lumora.test", admin, null),
+            200);
     assertThat(usersPage.get("totalElements").asLong()).isEqualTo(1);
     assertThat(usersPage.get("items").get(0).get("id").asText()).isEqualTo(user.id().toString());
 
@@ -523,8 +529,9 @@ class PaymentAndOperationsIT {
 
   private Actor actor(String role, String email) {
     String subject = "user_stage6_" + UUID.randomUUID().toString().replace("-", "");
+    String uniqueEmail = subject + "." + email;
     String token =
-        TestTokens.token(subject, c -> c.claim("email", email).claim("first_name", role));
+        TestTokens.token(subject, c -> c.claim("email", uniqueEmail).claim("first_name", role));
     try {
       var me = expect(send("GET", "/api/me", new Actor(null, subject, token), null), 200);
       UUID id = UUID.fromString(me.get("id").asText());

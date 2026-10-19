@@ -22,7 +22,6 @@ import org.springframework.web.server.ResponseStatusException;
 
 @Service
 @Validated
-@PreAuthorize("hasRole('ADMIN')")
 public class UserQueryService {
   private final UserRepository users;
   private final NamedParameterJdbcTemplate jdbc;
@@ -48,6 +47,7 @@ public class UserQueryService {
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
   }
 
+  @PreAuthorize("hasRole('ADMIN')")
   @Transactional(readOnly = true)
   public AdminUserViews.Page list(@NotNull @Valid AdminUserViews.Filter filter) {
     var params = new MapSqlParameterSource();
@@ -87,6 +87,7 @@ public class UserQueryService {
     return new AdminUserViews.Page(items, filter.page(), filter.size(), total);
   }
 
+  @PreAuthorize("hasRole('ADMIN')")
   @Transactional
   public UserProfile changeRole(UUID id, @NotNull Role nextRole) {
     var current = lockUser(id);
@@ -110,6 +111,7 @@ public class UserQueryService {
     return queryById(id);
   }
 
+  @PreAuthorize("hasRole('ADMIN')")
   @Transactional
   public UserProfile changeStatus(UUID id, @NotNull UserStatus nextStatus) {
     var current = lockUser(id);

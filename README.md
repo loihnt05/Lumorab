@@ -1,7 +1,8 @@
 # lumorab
 
 Lumora API with Stage 0 foundation, Stage 1 identity/authorization, Stage 2 inventory,
-Stage 3 public catalog/availability/pricing, and Stage 4 booking core.
+Stage 3 public catalog/availability/pricing, Stage 4 booking core, Stage 5 mock
+payment MVP, and Stage 6 operations/monitoring.
 Uses Java 21, Spring Boot, Spring MVC, Validation, OAuth2 Resource Server, Security,
 JPA, PostgreSQL, Flyway, Actuator, and springdoc OpenAPI. Requires Java 21 and
 Docker with Compose for the local database. The Maven wrapper is included.
@@ -45,7 +46,9 @@ database, validates/reruns migrations, and tests health/OpenAPI, signed JWTs,
 concurrent user creation, database roles, property permissions, inventory CRUD,
 metadata ownership, admin-only blocking, idempotent room-code rotation, public
 catalogs, date overlaps, booking holds/expiry, concurrent booking protection,
-price snapshots, guest history and scoped operations reads over real HTTP.
+price snapshots, guest history, mock payment transitions, check-in/out lifecycle,
+manager dashboard, admin user/assignment management, admin monitor, and audit logs
+over real HTTP.
 RSA signing keys and the trusted test decoder exist only under `src/test`.
 Use a disposable test database if you do not want migrations applied to local data.
 
@@ -62,6 +65,7 @@ Use a disposable test database if you do not want migrations applied to local da
 | `CLERK_ISSUER` | Exact HTTPS Clerk issuer URL, no trailing slash. Empty disables bearer authentication |
 | `CLERK_AUTHORIZED_PARTIES` | Exact permitted token `azp` origins, comma-separated; localhost:3000 by default |
 | `CLERK_AUDIENCE` | Optional required `aud`; leave empty for default Clerk session tokens |
+| `PAYMENT_MOCK_ENABLED` | Enables `/api/mock-payments/**` action endpoints; true by default |
 
 No database passwords are embedded in application source/config. Every API error
 uses `{ code, message, details, requestId }`; the ID is also returned in
@@ -89,17 +93,20 @@ com.lumora
   common/web/           Error contract and request correlation
   common/persistence/   UUID and audit timestamp base entity
   health/               Foundation API endpoint
-  identity/             Local users, profile synchronization, /api/me and admin user read
+  identity/             Local users, profile synchronization, /api/me and admin user management
     security/           Clerk JWT verification, principal and database-backed roles
   authorization/        Manager/property assignments and protected management queries
   property/             Property catalog and admin CRUD
   inventory/            Scoped room types/rooms, blocking, image and amenity metadata
-  accesscode/           Admin code retrieval and idempotent daily rotation
+  accesscode/           Manager/admin code retrieval and idempotent daily rotation
   catalog/              Public DTOs, catalog routes and batched room queries
   availability/         Date/guest validation and booking conflict search
   pricing/              Reusable base nightly price calculator
-  booking/              Transactional booking, snapshots, hold/expiry and scoped history
-src/main/resources/db/migration/  Immutable versioned Flyway migrations
+  booking/              Transactional booking, snapshots, hold/expiry, check-in/out and scoped history
+  payment/              PaymentGateway abstraction, MockPaymentGateway and payment endpoints
+  operations/           Manager property dashboard and admin system monitor
+  audit/                Redacted operational audit logging and admin query endpoint
+src/main/resources/db/migration/  Immutable versioned Flyway migrations (V1–V8)
 docs/                   API contract and development conventions
 ```
 
@@ -120,4 +127,10 @@ backend-only; public search UI remains deferred. Search does not reserve rooms.
 
 See [Stage 4 booking core](docs/stage-4-booking-core.md) for create/history/manager
 APIs, transaction lock ordering, expiry settings and the V6 migration/backfill.
-Payment HTTP flows follow in Stage 5. Stage 4 is backend-only; no FE build is needed.
+
+See [Stage 5 mock payment](docs/stage-5-mock-payment.md) for payment creation,
+mock payment callbacks (`success`, `fail`, `cancel`), idempotency, and the V7 migration.
+
+See [Stage 6 operations](docs/stage-6-operations.md) for manager dashboard,
+check-in/out/complete transitions, admin user/assignment management, system monitor,
+room access code operations, and V8 audit logs.
