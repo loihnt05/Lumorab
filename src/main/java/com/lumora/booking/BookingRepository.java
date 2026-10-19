@@ -288,11 +288,49 @@ public class BookingRepository {
         .orElseThrow(() -> notFound());
   }
 
+  public UUID findPropertyId(UUID id) {
+    return jdbc
+        .queryForList("SELECT property_id FROM bookings WHERE id=:id", Map.of("id", id), UUID.class)
+        .stream()
+        .findFirst()
+        .orElseThrow(() -> notFound());
+  }
+
   public void changeStatus(State booking, BookingStatus next) {
     booking.status().requireTransitionTo(next);
     if (jdbc.update(
             "UPDATE bookings SET status=:next WHERE id=:id AND status=:previous",
             Map.of("next", next.name(), "id", booking.id(), "previous", booking.status().name()))
+        != 1) throw conflict();
+  }
+
+  public void markCheckedIn(State booking, Instant now) {
+    booking.status().requireTransitionTo(BookingStatus.CHECKED_IN);
+    if (jdbc.update(
+            "UPDATE bookings SET status='CHECKED_IN',checked_in_at=:now WHERE id=:id AND status=:previous",
+            new MapSqlParameterSource("id", booking.id())
+                .addValue("previous", booking.status().name())
+                .addValue("now", Timestamp.from(now)))
+        != 1) throw conflict();
+  }
+
+  public void markCheckedOut(State booking, Instant now) {
+    booking.status().requireTransitionTo(BookingStatus.CHECKED_OUT);
+    if (jdbc.update(
+            "UPDATE bookings SET status='CHECKED_OUT',checked_out_at=:now WHERE id=:id AND status=:previous",
+            new MapSqlParameterSource("id", booking.id())
+                .addValue("previous", booking.status().name())
+                .addValue("now", Timestamp.from(now)))
+        != 1) throw conflict();
+  }
+
+  public void markCompleted(State booking, Instant now) {
+    booking.status().requireTransitionTo(BookingStatus.COMPLETED);
+    if (jdbc.update(
+            "UPDATE bookings SET status='COMPLETED',completed_at=:now WHERE id=:id AND status=:previous",
+            new MapSqlParameterSource("id", booking.id())
+                .addValue("previous", booking.status().name())
+                .addValue("now", Timestamp.from(now)))
         != 1) throw conflict();
   }
 

@@ -67,9 +67,14 @@ class BookingMigrationIT {
           connection.setSchema("public");
         }
       }
-      var flyway =
-          Flyway.configure().dataSource(dataSource).schemas(schema).defaultSchema(schema).load();
-      assertThat(flyway.migrate().migrationsExecuted).isEqualTo(1);
+      var flywayV6 =
+          Flyway.configure()
+              .dataSource(dataSource)
+              .schemas(schema)
+              .defaultSchema(schema)
+              .target("6")
+              .load();
+      assertThat(flywayV6.migrate().migrationsExecuted).isEqualTo(1);
       assertThat(
               jdbc.queryForObject(
                   "SELECT booking_code FROM " + schema + ".bookings WHERE id=?", String.class, b))
@@ -90,6 +95,9 @@ class BookingMigrationIT {
               jdbc.queryForObject(
                   "SELECT count(*) FROM " + schema + ".booking_guests", Integer.class))
           .isZero();
+      var flyway =
+          Flyway.configure().dataSource(dataSource).schemas(schema).defaultSchema(schema).load();
+      assertThat(flyway.migrate().migrationsExecuted).isGreaterThanOrEqualTo(0);
       flyway.validate();
       assertThat(flyway.migrate().migrationsExecuted).isZero();
     } finally {

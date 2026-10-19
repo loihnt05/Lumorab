@@ -4,6 +4,7 @@ import static com.lumora.inventory.InventoryRequests.*;
 import static com.lumora.inventory.InventoryViews.*;
 import static com.lumora.property.PropertyService.notFound;
 
+import com.lumora.audit.AuditService;
 import com.lumora.property.*;
 import jakarta.validation.Valid;
 import java.util.*;
@@ -24,6 +25,7 @@ public class InventoryService {
   private final RoomTypeRepository types;
   private final RoomRepository rooms;
   private final InventoryContentReader content;
+  private final AuditService audits;
 
   public List<RoomTypeView> publicTypes(UUID propertyId) {
     activeProperty(propertyId);
@@ -137,8 +139,23 @@ public class InventoryService {
   @PreAuthorize("hasRole('ADMIN')")
   public RoomView block(UUID id, @Valid BlockRequest request) {
     var room = rooms.lock(id).orElseThrow(PropertyService::notFound);
+    boolean previous = room.isBlocked();
     room.changeBlocked(request.isBlocked());
-    return view(rooms.saveAndFlush(room));
+    var saved = rooms.saveAndFlush(room);
+    if (audits != null) {
+      audits.record(
+          "ROOM_BLOCK_CHANGE",
+          "ROOM",
+          id,
+          Map.of(
+              "propertyId",
+              room.getPropertyId().toString(),
+              "previousBlocked",
+              previous,
+              "isBlocked",
+              request.isBlocked()));
+    }
+    return view(saved);
   }
 
   private void requireProperty(UUID id) {

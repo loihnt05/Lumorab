@@ -37,6 +37,8 @@ app:
     expiry-enabled: ${BOOKING_EXPIRY_ENABLED:true}
     expiry-interval: ${BOOKING_EXPIRY_INTERVAL:30s}
     expiry-batch-size: ${BOOKING_EXPIRY_BATCH_SIZE:100}
+  payment:
+    mock-enabled: ${PAYMENT_MOCK_ENABLED:true}
   room-codes:
     enabled: ${ROOM_CODES_ENABLED:true}
     zone: ${ROOM_CODES_ZONE:Asia/Ho_Chi_Minh}

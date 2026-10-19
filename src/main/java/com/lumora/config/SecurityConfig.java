@@ -67,6 +67,16 @@ public class SecurityConfig {
                     .authenticated()
                     .requestMatchers(HttpMethod.POST, "/api/bookings")
                     .hasRole("USER")
+                    .requestMatchers(HttpMethod.POST, "/api/bookings/*/payments")
+                    .hasRole("USER")
+                    .requestMatchers(HttpMethod.GET, "/api/bookings/*/payments")
+                    .authenticated()
+                    .requestMatchers(
+                        HttpMethod.POST,
+                        "/api/mock-payments/*/success",
+                        "/api/mock-payments/*/fail",
+                        "/api/mock-payments/*/cancel")
+                    .authenticated()
                     .requestMatchers(HttpMethod.GET, "/api/me/bookings", "/api/me/bookings/*")
                     .authenticated()
                     .anyRequest()

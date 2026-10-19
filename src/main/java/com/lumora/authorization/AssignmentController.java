@@ -7,7 +7,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/admin/users/{userId}/properties")
+@RequestMapping({"/api/admin/users/{userId}/properties", "/api/admin/managers/{userId}/properties"})
 @SecurityRequirement(name = "clerkBearer")
 public class AssignmentController {
   private final AssignmentService assignments;
@@ -19,6 +19,12 @@ public class AssignmentController {
   @GetMapping
   public List<UUID> list(@PathVariable UUID userId) {
     return assignments.list(userId);
+  }
+
+  @PostMapping("/{propertyId}")
+  @ResponseStatus(HttpStatus.NO_CONTENT)
+  public void assignPost(@PathVariable UUID userId, @PathVariable UUID propertyId) {
+    assignments.assign(userId, propertyId);
   }
 
   @PutMapping("/{propertyId}")

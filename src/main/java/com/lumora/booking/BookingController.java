@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.http.CacheControl;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -50,6 +51,42 @@ public class BookingController {
   public ResponseEntity<BookingViews.Detail> managed(
       @PathVariable UUID propertyId, @PathVariable UUID id) {
     return ok(bookings.managed(propertyId, id));
+  }
+
+  @PostMapping("/api/manager/bookings/{id}/check-in")
+  public ResponseEntity<BookingViews.Detail> checkIn(
+      Authentication authentication, @PathVariable UUID id) {
+    return ok(bookings.checkIn(authentication, id, null));
+  }
+
+  @PostMapping("/api/manager/bookings/{id}/check-out")
+  public ResponseEntity<BookingViews.Detail> checkOut(
+      Authentication authentication, @PathVariable UUID id) {
+    return ok(bookings.checkOut(authentication, id, null));
+  }
+
+  @PostMapping("/api/manager/bookings/{id}/complete")
+  public ResponseEntity<BookingViews.Detail> complete(
+      Authentication authentication, @PathVariable UUID id) {
+    return ok(bookings.complete(authentication, id, null));
+  }
+
+  @PostMapping("/api/manager/properties/{propertyId}/bookings/{id}/check-in")
+  public ResponseEntity<BookingViews.Detail> checkInScoped(
+      Authentication authentication, @PathVariable UUID propertyId, @PathVariable UUID id) {
+    return ok(bookings.checkIn(authentication, id, propertyId));
+  }
+
+  @PostMapping("/api/manager/properties/{propertyId}/bookings/{id}/check-out")
+  public ResponseEntity<BookingViews.Detail> checkOutScoped(
+      Authentication authentication, @PathVariable UUID propertyId, @PathVariable UUID id) {
+    return ok(bookings.checkOut(authentication, id, propertyId));
+  }
+
+  @PostMapping("/api/manager/properties/{propertyId}/bookings/{id}/complete")
+  public ResponseEntity<BookingViews.Detail> completeScoped(
+      Authentication authentication, @PathVariable UUID propertyId, @PathVariable UUID id) {
+    return ok(bookings.complete(authentication, id, propertyId));
   }
 
   @GetMapping("/api/admin/bookings")
