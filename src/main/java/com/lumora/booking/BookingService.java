@@ -4,6 +4,8 @@ import static com.lumora.property.PropertyService.notFound;
 
 import com.lumora.audit.AuditService;
 import com.lumora.authorization.PropertyAccess;
+import com.lumora.identity.Role;
+import com.lumora.identity.security.CurrentUser;
 import com.lumora.pricing.PricingService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
@@ -91,6 +93,81 @@ public class BookingService {
   @PreAuthorize("hasRole('ADMIN')")
   public BookingViews.Detail adminDetail(UUID id) {
     return bookings.detail(id, null, null);
+  }
+
+  @PreAuthorize("isAuthenticated()")
+  public BookingViews.CheckInQr checkInQr(CurrentUser user, UUID id) {
+    var row = bookings.findQrRow(id);
+    if (user.role() == Role.ADMIN) {
+      // Admin allowed
+    } else if (user.role() == Role.MANAGER) {
+      if (!propertyAccess.managerHasProperty(user.id(), row.propertyId())
+          && !row.userId().equals(user.id())) {
+        throw new AccessDeniedException("Forbidden");
+      }
+    } else if (!row.userId().equals(user.id())) {
+      throw notFound();
+    }
+    if ((row.status() != BookingStatus.CONFIRMED && row.status() != BookingStatus.CHECKED_IN)
+        || row.qrToken() == null) {
+      throw BookingRepository.conflict();
+    }
+    return new BookingViews.CheckInQr(
+        row.bookingId(),
+        row.bookingCode(),
+        row.propertyId(),
+        row.propertyName(),
+        row.status(),
+        row.checkIn(),
+        row.checkOut(),
+        row.qrToken(),
+        "CHECK_IN_QR");
+  }
+
+  @Transactional(isolation = Isolation.READ_COMMITTED)
+  @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
+  public BookingViews.CheckInQrVerification verifyCheckInQr(
+      Authentication authentication,
+      @NotNull @Valid BookingViews.VerifyCheckInQrRequest request,
+      UUID scopedPropertyId) {
+    String token = request.qrToken() == null ? "" : request.qrToken().trim();
+    if (!token.startsWith(BookingRepository.CHECK_IN_QR_PREFIX)) {
+      throw new ResponseStatusException(
+          HttpStatus.BAD_REQUEST,
+          "Invalid check-in QR token; payment QR cannot be used for check-in.");
+    }
+    var row = bookings.findQrRowByToken(token);
+    UUID propertyId = resolveManagedProperty(authentication, row.bookingId(), scopedPropertyId);
+    if (row.status() != BookingStatus.CONFIRMED && row.status() != BookingStatus.CHECKED_IN) {
+      throw BookingRepository.conflict();
+    }
+    LocalDate today = LocalDate.ofInstant(clock.instant(), properties.zone());
+    if (!today.isBefore(row.checkOut())) {
+      throw BookingRepository.conflict();
+    }
+    boolean checkInWindowOpen = !today.isBefore(row.checkIn()) && today.isBefore(row.checkOut());
+    audits.record(
+        "BOOKING_CHECK_IN_QR_VERIFY",
+        "BOOKING",
+        row.bookingId(),
+        Map.of(
+            "propertyId",
+            propertyId.toString(),
+            "status",
+            row.status().name(),
+            "checkInWindowOpen",
+            checkInWindowOpen));
+    return new BookingViews.CheckInQrVerification(
+        true,
+        row.bookingId(),
+        row.bookingCode(),
+        row.propertyId(),
+        row.propertyName(),
+        row.status(),
+        row.checkIn(),
+        row.checkOut(),
+        checkInWindowOpen,
+        row.primaryGuestName());
   }
 
   @Transactional(isolation = Isolation.READ_COMMITTED)

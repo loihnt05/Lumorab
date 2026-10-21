@@ -9,8 +9,14 @@ import org.springframework.context.annotation.Configuration;
 public class PaymentConfiguration {}
 
 @ConfigurationProperties(prefix = "app.payment")
-record PaymentProperties(Boolean mockEnabled) {
+record PaymentProperties(Boolean mockEnabled, String defaultProvider, String webhookSecret) {
   PaymentProperties {
     mockEnabled = mockEnabled == null || mockEnabled;
+    defaultProvider =
+        defaultProvider == null || defaultProvider.isBlank() ? "MOCK" : defaultProvider.trim();
+    webhookSecret =
+        webhookSecret == null || webhookSecret.isBlank()
+            ? "lumora-stage7-webhook-secret-key"
+            : webhookSecret;
   }
 }

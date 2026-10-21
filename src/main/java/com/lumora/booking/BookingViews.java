@@ -1,5 +1,6 @@
 package com.lumora.booking;
 
+import jakarta.validation.constraints.NotBlank;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -43,4 +44,29 @@ public final class BookingViews {
       List<Guest> guests) {}
 
   public record Page(List<Summary> items, int page, int size, long totalElements) {}
+
+  public record CheckInQr(
+      UUID bookingId,
+      String bookingCode,
+      UUID propertyId,
+      String propertyName,
+      BookingStatus status,
+      LocalDate checkIn,
+      LocalDate checkOut,
+      String qrToken,
+      String qrType) {}
+
+  public record VerifyCheckInQrRequest(@NotBlank String qrToken) {}
+
+  public record CheckInQrVerification(
+      boolean valid,
+      UUID bookingId,
+      String bookingCode,
+      UUID propertyId,
+      String propertyName,
+      BookingStatus status,
+      LocalDate checkIn,
+      LocalDate checkOut,
+      boolean checkInWindowOpen,
+      String primaryGuestName) {}
 }

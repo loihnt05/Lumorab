@@ -91,4 +91,16 @@ public final class OperationsViews {
       long totalBookings,
       Map<String, Long> bookingsByStatus,
       List<DailyBookingPoint> dailyTrend) {}
+
+  public record OperationalStatus(
+      java.time.Instant checkedAt,
+      LocalDate currentLocalDate,
+      String timezone,
+      String databaseStatus,
+      int appliedMigrations,
+      long overduePendingHolds,
+      long activeRoomCodesToday,
+      long pendingPaymentsCount,
+      long sentEmailsCount,
+      long failedEmailsCount) {}
 }

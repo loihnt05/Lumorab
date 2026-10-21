@@ -1,8 +1,9 @@
 package com.lumora.booking;
 
+import com.lumora.notification.EmailNotificationService;
 import java.time.Clock;
 import java.util.UUID;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
@@ -12,10 +13,22 @@ import org.springframework.transaction.annotation.Transactional;
  * verification.
  */
 @Service
-@RequiredArgsConstructor
 public class BookingConfirmationService {
   private final BookingRepository bookings;
   private final Clock clock;
+  private final EmailNotificationService notifications;
+
+  public BookingConfirmationService(BookingRepository bookings, Clock clock) {
+    this(bookings, clock, null);
+  }
+
+  @Autowired
+  public BookingConfirmationService(
+      BookingRepository bookings, Clock clock, EmailNotificationService notifications) {
+    this.bookings = bookings;
+    this.clock = clock;
+    this.notifications = notifications;
+  }
 
   @Transactional(isolation = Isolation.READ_COMMITTED)
   public void confirm(UUID id) {
@@ -33,5 +46,8 @@ public class BookingConfirmationService {
         throw BookingRepository.conflict();
     }
     bookings.changeStatus(booking, BookingStatus.CONFIRMED);
+    if (notifications != null) {
+      notifications.enqueueBookingConfirmed(id);
+    }
   }
 }

@@ -4,6 +4,9 @@ import static com.lumora.property.PropertyService.notFound;
 
 import com.lumora.audit.AuditService;
 import com.lumora.authorization.PropertyAccess;
+import com.lumora.booking.BookingRepository;
+import com.lumora.booking.BookingStatus;
+import com.lumora.identity.security.CurrentUser;
 import java.time.*;
 import java.util.Map;
 import java.util.UUID;
@@ -24,9 +27,10 @@ public class RoomCodeService {
   private final RoomCodeBatch batch;
   private final PropertyAccess propertyAccess;
   private final AuditService audits;
+  private final Clock clock;
 
   public RoomCodeService(JdbcTemplate jdbc, RoomCodeProperties properties, RoomCodeBatch batch) {
-    this(jdbc, properties, batch, null, null);
+    this(jdbc, properties, batch, null, null, Clock.systemUTC());
   }
 
   @Autowired
@@ -35,12 +39,14 @@ public class RoomCodeService {
       RoomCodeProperties properties,
       RoomCodeBatch batch,
       PropertyAccess propertyAccess,
-      AuditService audits) {
+      AuditService audits,
+      Clock clock) {
     this.jdbc = jdbc;
     this.properties = properties;
     this.batch = batch;
     this.propertyAccess = propertyAccess;
     this.audits = audits;
+    this.clock = clock == null ? Clock.systemUTC() : clock;
   }
 
   public record Code(
@@ -50,6 +56,14 @@ public class RoomCodeService {
       return "RoomAccessCode[REDACTED]";
     }
   }
+
+  private record GuestBookingRow(
+      UUID bookingId,
+      UUID userId,
+      UUID roomId,
+      BookingStatus status,
+      LocalDate checkIn,
+      LocalDate checkOut) {}
 
   @Transactional
   @PreAuthorize("hasRole('ADMIN')")
@@ -110,6 +124,54 @@ public class RoomCodeService {
             .findFirst()
             .orElseThrow(() -> notFound());
     return findCurrentForManager(authentication, propertyId, roomId);
+  }
+
+  @Transactional
+  @PreAuthorize("isAuthenticated()")
+  public Code findCurrentForBookingGuest(CurrentUser user, UUID bookingId) {
+    var row =
+        jdbc
+            .query(
+                """
+                SELECT b.id, b.user_id, br.room_id, b.status, b.check_in_date, b.check_out_date
+                FROM bookings b
+                JOIN booking_rooms br ON br.booking_id = b.id
+                WHERE b.id = ?
+                ORDER BY br.room_number, br.room_id
+                LIMIT 1
+                """,
+                (rs, n) ->
+                    new GuestBookingRow(
+                        rs.getObject(1, UUID.class),
+                        rs.getObject(2, UUID.class),
+                        rs.getObject(3, UUID.class),
+                        BookingStatus.valueOf(rs.getString(4)),
+                        rs.getObject(5, LocalDate.class),
+                        rs.getObject(6, LocalDate.class)),
+                bookingId)
+            .stream()
+            .findFirst()
+            .orElseThrow(() -> notFound());
+    if (!row.userId().equals(user.id())) {
+      throw notFound();
+    }
+    if (row.status() != BookingStatus.CONFIRMED && row.status() != BookingStatus.CHECKED_IN) {
+      throw BookingRepository.conflict();
+    }
+    LocalDate today = LocalDate.ofInstant(clock.instant(), properties.zone());
+    if (today.isBefore(row.checkIn()) || !today.isBefore(row.checkOut())) {
+      throw BookingRepository.conflict();
+    }
+    Code code = queryActiveCode(row.roomId(), today);
+    if (audits != null) {
+      audits.record(
+          "ROOM_CODE_READ",
+          "ROOM",
+          row.roomId(),
+          Map.of(
+              "bookingId", bookingId.toString(), "validDate", today.toString(), "scope", "GUEST"));
+    }
+    return code;
   }
 
   @PreAuthorize("hasRole('ADMIN')")

@@ -1,0 +1,48 @@
+name: Backend CI/CD
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: homestay_booking
+          POSTGRES_USER: lumora
+          POSTGRES_PASSWORD: lumora_ci_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U lumora -d homestay_booking"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+
+    env:
+      DB_HOST: 127.0.0.1
+      DB_PORT: 5432
+      DB_NAME: homestay_booking
+      DB_USER: lumora
+      DB_PASSWORD: lumora_ci_password
+      ROOM_CODES_ENABLED: "false"
+      BOOKING_EXPIRY_ENABLED: "false"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Run Spotless formatting check, Unit Tests, and PostgreSQL Integration Tests
+        run: ./mvnw -B -ntp -Pintegration verify

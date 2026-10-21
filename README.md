@@ -2,7 +2,8 @@
 
 Lumora API with Stage 0 foundation, Stage 1 identity/authorization, Stage 2 inventory,
 Stage 3 public catalog/availability/pricing, Stage 4 booking core, Stage 5 mock
-payment MVP, and Stage 6 operations/monitoring.
+payment MVP, Stage 6 operations/monitoring, Stage 7 business upgrades, and Stage 8
+production hardening & deploy.
 Uses Java 21, Spring Boot, Spring MVC, Validation, OAuth2 Resource Server, Security,
 JPA, PostgreSQL, Flyway, Actuator, and springdoc OpenAPI. Requires Java 21 and
 Docker with Compose for the local database. The Maven wrapper is included.
@@ -21,6 +22,8 @@ so Spring and Compose can load `.env`. Environment variables override that file.
 The example credentials are for local development only; `.env` is Git-ignored.
 
 - Health with database check: http://localhost:8080/api/health
+- Liveness probe: http://localhost:8080/api/health/liveness
+- Readiness probe (DB + Flyway): http://localhost:8080/api/health/readiness
 - Actuator health: http://localhost:8080/actuator/health
 - Swagger UI: http://localhost:8080/swagger-ui.html
 - OpenAPI JSON: http://localhost:8080/v3/api-docs
@@ -47,8 +50,10 @@ concurrent user creation, database roles, property permissions, inventory CRUD,
 metadata ownership, admin-only blocking, idempotent room-code rotation, public
 catalogs, date overlaps, booking holds/expiry, concurrent booking protection,
 price snapshots, guest history, mock payment transitions, check-in/out lifecycle,
-manager dashboard, admin user/assignment management, admin monitor, and audit logs
-over real HTTP.
+manager dashboard, admin user/assignment management, admin monitor, audit logs,
+cancellation/refund tiers, signed payment webhooks, payment/check-in QR separation,
+guest room access code delivery, production indexes, security headers, rate limiting,
+and operational readiness over real HTTP.
 RSA signing keys and the trusted test decoder exist only under `src/test`.
 Use a disposable test database if you do not want migrations applied to local data.
 
@@ -65,7 +70,13 @@ Use a disposable test database if you do not want migrations applied to local da
 | `CLERK_ISSUER` | Exact HTTPS Clerk issuer URL, no trailing slash. Empty disables bearer authentication |
 | `CLERK_AUTHORIZED_PARTIES` | Exact permitted token `azp` origins, comma-separated; localhost:3000 by default |
 | `CLERK_AUDIENCE` | Optional required `aud`; leave empty for default Clerk session tokens |
-| `PAYMENT_MOCK_ENABLED` | Enables `/api/mock-payments/**` action endpoints; true by default |
+| `PAYMENT_MOCK_ENABLED` | Enables `/api/mock-payments/**` action endpoints; true in dev, false in `prod` |
+| `PAYMENT_DEFAULT_PROVIDER` | Default payment provider (`MOCK` or `VIETQR`); `MOCK` in dev, `VIETQR` in `prod` |
+| `PAYMENT_WEBHOOK_SECRET` | HMAC-SHA256 secret for `/api/webhooks/payments/*` verification |
+| `CANCELLATION_FREE_HOURS` | Hours before check-in for 100% refund; 48 by default |
+| `CANCELLATION_PARTIAL_HOURS` | Hours before check-in for 50% refund; 24 by default |
+| `RATE_LIMIT_ENABLED` | Enables per-client rate limiting on public/webhook routes; true by default |
+| `RATE_LIMIT_REQUESTS_PER_MINUTE` | Max requests per minute per client on rate-limited routes; 600 in dev, 120 in `prod` |
 
 No database passwords are embedded in application source/config. Every API error
 uses `{ code, message, details, requestId }`; the ID is also returned in
@@ -89,24 +100,27 @@ optional signed profile claims, first-admin provisioning and property assignment
 
 ```text
 com.lumora
-  config/               Infrastructure, security, OpenAPI, auditing
-  common/web/           Error contract and request correlation
+  config/               Infrastructure, security headers, CORS, OpenAPI, auditing
+  common/web/           Error contract, request correlation, and per-client rate limiting
   common/persistence/   UUID and audit timestamp base entity
-  health/               Foundation API endpoint
+  health/               Liveness, readiness, and database health endpoints
   identity/             Local users, profile synchronization, /api/me and admin user management
     security/           Clerk JWT verification, principal and database-backed roles
   authorization/        Manager/property assignments and protected management queries
   property/             Property catalog and admin CRUD
   inventory/            Scoped room types/rooms, blocking, image and amenity metadata
-  accesscode/           Manager/admin code retrieval and idempotent daily rotation
+  accesscode/           Guest/manager/admin code retrieval and idempotent daily rotation
   catalog/              Public DTOs, catalog routes and batched room queries
   availability/         Date/guest validation and booking conflict search
   pricing/              Reusable base nightly price calculator
-  booking/              Transactional booking, snapshots, hold/expiry, check-in/out and scoped history
-  payment/              PaymentGateway abstraction, MockPaymentGateway and payment endpoints
-  operations/           Manager property dashboard and admin system monitor
+  booking/              Transactional booking, snapshots, hold/expiry, check-in/out, check-in QR
+  cancellation/         Cancellation Policy v1, cancellation endpoints, and idempotent refunds
+  payment/              PaymentGateway, Mock & VietQR providers, Payment QR, webhooks, reconciliation
+  notification/         Idempotent transactional email notification outbox
+  operations/           Manager property dashboard, admin system monitor, and operational status
   audit/                Redacted operational audit logging and admin query endpoint
-src/main/resources/db/migration/  Immutable versioned Flyway migrations (V1–V8)
+src/main/resources/db/migration/  Immutable versioned Flyway migrations (V1–V10)
+scripts/                Database backup, restore drill, and post-deploy smoke test scripts
 docs/                   API contract and development conventions
 ```
 
@@ -134,3 +148,12 @@ mock payment callbacks (`success`, `fail`, `cancel`), idempotency, and the V7 mi
 See [Stage 6 operations](docs/stage-6-operations.md) for manager dashboard,
 check-in/out/complete transitions, admin user/assignment management, system monitor,
 room access code operations, and V8 audit logs.
+
+See [Stage 7 business upgrades](docs/stage-7-business-upgrades.md) for Cancellation
+Policy v1, idempotent refunds, VietQR/webhook verification, payment reconciliation,
+Check-in QR vs Payment QR separation, email outbox notifications, and guest room
+access code delivery (`V9`).
+
+See [Stage 8 production hardening & deploy](docs/stage-8-production-deploy.md) for
+`V10` performance indexes, rate limiting, security headers, liveness/readiness/ops
+status endpoints, `application-prod.yml`, Docker/CI-CD, and backup/restore drills.

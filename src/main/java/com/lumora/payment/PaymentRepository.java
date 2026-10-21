@@ -20,6 +20,8 @@ import org.springframework.stereotype.Repository;
 @Repository
 @RequiredArgsConstructor
 public class PaymentRepository {
+  public static final String PAYMENT_QR_PREFIX = "VIETQR|";
+
   private final NamedParameterJdbcTemplate jdbc;
 
   public record BookingOwnerHeader(
@@ -40,7 +42,21 @@ public class PaymentRepository {
       String currency,
       PaymentStatus status,
       String transactionId,
+      String qrPayload,
       Instant paidAt) {}
+
+  public static String buildQrPayload(
+      String paymentCode, BigDecimal amount, String currency, String provider) {
+    return PAYMENT_QR_PREFIX
+        + "PROVIDER="
+        + provider
+        + "|BANK=970436|ACC=0123456789|AMOUNT="
+        + amount.toPlainString()
+        + "|CCY="
+        + currency
+        + "|REF="
+        + paymentCode;
+  }
 
   public BookingOwnerHeader findBookingHeader(UUID bookingId) {
     return jdbc
@@ -87,6 +103,32 @@ public class PaymentRepository {
         .orElseThrow(com.lumora.property.PropertyService::notFound);
   }
 
+  public UUID findPaymentIdByCode(String paymentCode) {
+    return jdbc
+        .queryForList(
+            "SELECT id FROM payments WHERE payment_code = :code",
+            Map.of("code", paymentCode),
+            UUID.class)
+        .stream()
+        .findFirst()
+        .orElseThrow(com.lumora.property.PropertyService::notFound);
+  }
+
+  public UUID findLatestPaymentIdForBooking(UUID bookingId) {
+    return jdbc
+        .queryForList(
+            """
+            SELECT id FROM payments
+            WHERE booking_id = :bookingId
+            ORDER BY created_at DESC, id DESC LIMIT 1
+            """,
+            Map.of("bookingId", bookingId),
+            UUID.class)
+        .stream()
+        .findFirst()
+        .orElseThrow(com.lumora.property.PropertyService::notFound);
+  }
+
   public LockedPayment lock(UUID id) {
     return jdbc
         .query(
@@ -102,6 +144,7 @@ public class PaymentRepository {
                     rs.getString("currency"),
                     PaymentStatus.valueOf(rs.getString("status")),
                     rs.getString("transaction_id"),
+                    rs.getString("qr_payload"),
                     instant(rs, "paid_at")))
         .stream()
         .findFirst()
@@ -117,6 +160,7 @@ public class PaymentRepository {
       String currency,
       String transactionId,
       Instant now) {
+    String qrPayload = buildQrPayload(paymentCode, amount, currency, provider);
     var params =
         new MapSqlParameterSource()
             .addValue("id", id)
@@ -126,13 +170,14 @@ public class PaymentRepository {
             .addValue("amount", amount)
             .addValue("currency", currency)
             .addValue("transactionId", transactionId)
+            .addValue("qrPayload", qrPayload)
             .addValue("now", Timestamp.from(now));
     jdbc.update(
         """
         INSERT INTO payments(id, booking_id, payment_code, provider, amount, currency,
-          status, transaction_id, created_at, updated_at)
+          status, transaction_id, qr_payload, created_at, updated_at)
         VALUES (:id, :bookingId, :paymentCode, :provider, :amount, :currency,
-          'PENDING', :transactionId, :now, :now)
+          'PENDING', :transactionId, :qrPayload, :now, :now)
         """,
         params);
   }
@@ -168,6 +213,39 @@ public class PaymentRepository {
     if (updated != 1) throw BookingRepository.conflict();
   }
 
+  public boolean insertWebhookEventIfAbsent(
+      String provider,
+      String eventId,
+      UUID paymentId,
+      UUID bookingId,
+      String eventType,
+      String outcome,
+      String payloadSummary,
+      Instant now) {
+    int inserted =
+        jdbc.update(
+            """
+            INSERT INTO payment_webhook_events(
+              id, provider, event_id, payment_id, booking_id,
+              event_type, outcome, payload_summary, received_at
+            ) VALUES (
+              :id, :provider, :eventId, :paymentId, :bookingId,
+              :eventType, :outcome, :payloadSummary, :now
+            ) ON CONFLICT (provider, event_id) DO NOTHING
+            """,
+            new MapSqlParameterSource()
+                .addValue("id", UUID.randomUUID())
+                .addValue("provider", provider)
+                .addValue("eventId", eventId)
+                .addValue("paymentId", paymentId)
+                .addValue("bookingId", bookingId)
+                .addValue("eventType", eventType)
+                .addValue("outcome", outcome)
+                .addValue("payloadSummary", payloadSummary)
+                .addValue("now", Timestamp.from(now)));
+    return inserted == 1;
+  }
+
   public PaymentViews.Detail detail(UUID id) {
     return jdbc
         .query(
@@ -178,6 +256,36 @@ public class PaymentRepository {
             """,
             Map.of("id", id),
             (rs, n) -> mapDetail(rs))
+        .stream()
+        .findFirst()
+        .orElseThrow(() -> notFound());
+  }
+
+  public PaymentViews.PaymentQr paymentQr(UUID id) {
+    return jdbc
+        .query(
+            "SELECT * FROM payments WHERE id = :id",
+            Map.of("id", id),
+            (rs, n) -> {
+              String code = rs.getString("payment_code");
+              BigDecimal amount = rs.getBigDecimal("amount");
+              String currency = rs.getString("currency");
+              String provider = rs.getString("provider");
+              String qrPayload = rs.getString("qr_payload");
+              if (qrPayload == null || qrPayload.isBlank()) {
+                qrPayload = buildQrPayload(code, amount, currency, provider);
+              }
+              return new PaymentViews.PaymentQr(
+                  rs.getObject("id", UUID.class),
+                  rs.getObject("booking_id", UUID.class),
+                  code,
+                  provider,
+                  amount,
+                  currency,
+                  PaymentStatus.valueOf(rs.getString("status")),
+                  qrPayload,
+                  "PAYMENT_QR");
+            })
         .stream()
         .findFirst()
         .orElseThrow(() -> notFound());

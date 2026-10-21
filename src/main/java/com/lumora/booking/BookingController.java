@@ -41,6 +41,26 @@ public class BookingController {
     return ok(bookings.mine(user.id(), id));
   }
 
+  @GetMapping({"/api/me/bookings/{id}/check-in-qr", "/api/bookings/{id}/check-in-qr"})
+  public ResponseEntity<BookingViews.CheckInQr> checkInQr(
+      @AuthenticationPrincipal CurrentUser user, @PathVariable UUID id) {
+    return ok(bookings.checkInQr(user, id));
+  }
+
+  @PostMapping("/api/manager/check-in-qr/verify")
+  public ResponseEntity<BookingViews.CheckInQrVerification> verifyCheckInQr(
+      Authentication authentication, @Valid @RequestBody BookingViews.VerifyCheckInQrRequest body) {
+    return ok(bookings.verifyCheckInQr(authentication, body, null));
+  }
+
+  @PostMapping("/api/manager/properties/{propertyId}/check-in-qr/verify")
+  public ResponseEntity<BookingViews.CheckInQrVerification> verifyCheckInQrScoped(
+      Authentication authentication,
+      @PathVariable UUID propertyId,
+      @Valid @RequestBody BookingViews.VerifyCheckInQrRequest body) {
+    return ok(bookings.verifyCheckInQr(authentication, body, propertyId));
+  }
+
   @GetMapping("/api/manager/properties/{propertyId}/bookings")
   public ResponseEntity<BookingViews.Page> managed(
       @PathVariable UUID propertyId, @Valid @ParameterObject @ModelAttribute BookingFilter filter) {

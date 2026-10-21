@@ -37,8 +37,17 @@ app:
     expiry-enabled: ${BOOKING_EXPIRY_ENABLED:true}
     expiry-interval: ${BOOKING_EXPIRY_INTERVAL:30s}
     expiry-batch-size: ${BOOKING_EXPIRY_BATCH_SIZE:100}
+  cancellation:
+    free-hours-before-check-in: ${CANCELLATION_FREE_HOURS:48}
+    partial-hours-before-check-in: ${CANCELLATION_PARTIAL_HOURS:24}
+    zone: ${BOOKING_ZONE:Asia/Ho_Chi_Minh}
   payment:
     mock-enabled: ${PAYMENT_MOCK_ENABLED:true}
+    default-provider: ${PAYMENT_DEFAULT_PROVIDER:MOCK}
+    webhook-secret: ${PAYMENT_WEBHOOK_SECRET:lumora-stage7-webhook-secret-key}
+  rate-limit:
+    enabled: ${RATE_LIMIT_ENABLED:true}
+    requests-per-minute: ${RATE_LIMIT_REQUESTS_PER_MINUTE:600}
   room-codes:
     enabled: ${ROOM_CODES_ENABLED:true}
     zone: ${ROOM_CODES_ZONE:Asia/Ho_Chi_Minh}

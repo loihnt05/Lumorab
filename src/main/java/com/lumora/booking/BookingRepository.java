@@ -18,6 +18,8 @@ import org.springframework.web.server.ResponseStatusException;
 @Repository
 @RequiredArgsConstructor
 public class BookingRepository {
+  public static final String CHECK_IN_QR_PREFIX = "LMR-CHK-";
+
   private final NamedParameterJdbcTemplate jdbc;
 
   public record LockedRoom(
@@ -38,6 +40,22 @@ public class BookingRepository {
       LocalDate checkOut,
       BookingStatus status,
       Instant expiresAt) {}
+
+  public record QrRow(
+      UUID bookingId,
+      UUID userId,
+      UUID propertyId,
+      String propertyName,
+      String bookingCode,
+      BookingStatus status,
+      LocalDate checkIn,
+      LocalDate checkOut,
+      String qrToken,
+      String primaryGuestName) {}
+
+  public static String checkInQrTokenFor(UUID bookingId) {
+    return CHECK_IN_QR_PREFIX + bookingId.toString().replace("-", "").toUpperCase(Locale.ROOT);
+  }
 
   public LockedRoom lockRoom(UUID roomId) {
     return jdbc
@@ -298,10 +316,101 @@ public class BookingRepository {
 
   public void changeStatus(State booking, BookingStatus next) {
     booking.status().requireTransitionTo(next);
+    if (next == BookingStatus.CONFIRMED) {
+      if (jdbc.update(
+              """
+              UPDATE bookings
+              SET status=:next,
+                  check_in_qr_token = COALESCE(check_in_qr_token, :qrToken)
+              WHERE id=:id AND status=:previous
+              """,
+              Map.of(
+                  "next",
+                  next.name(),
+                  "id",
+                  booking.id(),
+                  "previous",
+                  booking.status().name(),
+                  "qrToken",
+                  checkInQrTokenFor(booking.id())))
+          != 1) throw conflict();
+      return;
+    }
     if (jdbc.update(
             "UPDATE bookings SET status=:next WHERE id=:id AND status=:previous",
             Map.of("next", next.name(), "id", booking.id(), "previous", booking.status().name()))
         != 1) throw conflict();
+  }
+
+  public void markCancelled(State booking, UUID cancelledByUserId, String reason, Instant now) {
+    booking.status().requireTransitionTo(BookingStatus.CANCELLED);
+    if (jdbc.update(
+            """
+            UPDATE bookings
+            SET status='CANCELLED',
+                cancelled_at=:now,
+                cancelled_by_user_id=:cancelledBy,
+                cancellation_reason=:reason
+            WHERE id=:id AND status=:previous
+            """,
+            new MapSqlParameterSource("id", booking.id())
+                .addValue("previous", booking.status().name())
+                .addValue("now", Timestamp.from(now))
+                .addValue("cancelledBy", cancelledByUserId)
+                .addValue("reason", reason))
+        != 1) throw conflict();
+  }
+
+  public QrRow findQrRow(UUID id) {
+    return jdbc
+        .query(
+            """
+            SELECT b.id, b.user_id, b.property_id, p.name AS property_name,
+                   b.booking_code, b.status, b.check_in_date, b.check_out_date,
+                   b.check_in_qr_token,
+                   (SELECT g.full_name FROM booking_guests g
+                    WHERE g.booking_id = b.id ORDER BY g.is_primary_guest DESC, g.id LIMIT 1) AS primary_guest_name
+            FROM bookings b JOIN properties p ON p.id = b.property_id
+            WHERE b.id = :id
+            """,
+            Map.of("id", id),
+            (rs, n) -> mapQrRow(rs))
+        .stream()
+        .findFirst()
+        .orElseThrow(() -> notFound());
+  }
+
+  public QrRow findQrRowByToken(String qrToken) {
+    return jdbc
+        .query(
+            """
+            SELECT b.id, b.user_id, b.property_id, p.name AS property_name,
+                   b.booking_code, b.status, b.check_in_date, b.check_out_date,
+                   b.check_in_qr_token,
+                   (SELECT g.full_name FROM booking_guests g
+                    WHERE g.booking_id = b.id ORDER BY g.is_primary_guest DESC, g.id LIMIT 1) AS primary_guest_name
+            FROM bookings b JOIN properties p ON p.id = b.property_id
+            WHERE b.check_in_qr_token = :qrToken
+            """,
+            Map.of("qrToken", qrToken),
+            (rs, n) -> mapQrRow(rs))
+        .stream()
+        .findFirst()
+        .orElseThrow(() -> notFound());
+  }
+
+  private QrRow mapQrRow(ResultSet rs) throws SQLException {
+    return new QrRow(
+        rs.getObject("id", UUID.class),
+        rs.getObject("user_id", UUID.class),
+        rs.getObject("property_id", UUID.class),
+        rs.getString("property_name"),
+        rs.getString("booking_code"),
+        BookingStatus.valueOf(rs.getString("status")),
+        rs.getObject("check_in_date", LocalDate.class),
+        rs.getObject("check_out_date", LocalDate.class),
+        rs.getString("check_in_qr_token"),
+        rs.getString("primary_guest_name"));
   }
 
   public void markCheckedIn(State booking, Instant now) {

@@ -482,6 +482,43 @@ public class OperationsService {
         new ArrayList<>(byDate.values()));
   }
 
+  @PreAuthorize("hasRole('ADMIN')")
+  public OperationsViews.OperationalStatus operationalStatus() {
+    Instant now = clock.instant();
+    LocalDate today = LocalDate.ofInstant(now, bookingProperties.zone());
+    var params =
+        new MapSqlParameterSource().addValue("now", Timestamp.from(now)).addValue("today", today);
+    long appliedMigrations =
+        count(
+            "SELECT count(*) FROM flyway_schema_history WHERE success = true",
+            new MapSqlParameterSource());
+    long overdueHolds =
+        count(
+            "SELECT count(*) FROM bookings WHERE status = 'PENDING_PAYMENT' AND expires_at <= :now",
+            params);
+    long activeCodesToday =
+        count(
+            "SELECT count(*) FROM room_access_codes WHERE valid_date = :today AND status = 'ACTIVE'",
+            params);
+    long pendingPayments = count("SELECT count(*) FROM payments WHERE status = 'PENDING'", params);
+    long sentEmails =
+        count("SELECT count(*) FROM email_notifications WHERE status = 'SENT'", params);
+    long failedEmails =
+        count("SELECT count(*) FROM email_notifications WHERE status = 'FAILED'", params);
+
+    return new OperationsViews.OperationalStatus(
+        now,
+        today,
+        bookingProperties.zone().getId(),
+        "UP",
+        (int) appliedMigrations,
+        overdueHolds,
+        activeCodesToday,
+        pendingPayments,
+        sentEmails,
+        failedEmails);
+  }
+
   private record PropertyHeader(UUID id, String name, String slug, String status) {}
 
   private record DateRange(LocalDate from, LocalDate to) {}

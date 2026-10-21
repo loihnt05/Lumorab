@@ -44,6 +44,11 @@ public class OperationsController {
     return ok(operations.monitorBookings(from, to, propertyId));
   }
 
+  @GetMapping("/api/admin/ops/status")
+  public ResponseEntity<OperationsViews.OperationalStatus> operationalStatus() {
+    return ok(operations.operationalStatus());
+  }
+
   private <T> ResponseEntity<T> ok(T body) {
     return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(body);
   }
