@@ -21,6 +21,16 @@ import org.springframework.web.server.ResponseStatusException;
 public class GlobalExceptionHandler {
   private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
+  @ExceptionHandler(org.springframework.dao.DataIntegrityViolationException.class)
+  ResponseEntity<ApiError> conflict(HttpServletRequest request) {
+    return error(
+        HttpStatus.CONFLICT,
+        "CONFLICT",
+        "The change conflicts with existing data.",
+        Map.of(),
+        request);
+  }
+
   @ExceptionHandler(MethodArgumentTypeMismatchException.class)
   ResponseEntity<ApiError> invalidParameter(
       MethodArgumentTypeMismatchException exception, HttpServletRequest request) {

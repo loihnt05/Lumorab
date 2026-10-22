@@ -44,11 +44,40 @@ public class SecurityConfig {
                         "/v3/api-docs",
                         "/v3/api-docs/**")
                     .permitAll()
+                    .requestMatchers(
+                        HttpMethod.GET,
+                        "/api/properties",
+                        "/api/properties/*",
+                        "/api/properties/*/room-types",
+                        "/api/properties/*/room-types/*",
+                        "/api/properties/*/rooms",
+                        "/api/properties/*/rooms/*",
+                        "/api/public/properties",
+                        "/api/public/properties/*",
+                        "/api/public/properties/*/rooms",
+                        "/api/public/rooms/*",
+                        "/api/public/availability",
+                        "/api/amenities")
+                    .permitAll()
                     .requestMatchers("/api/admin/**")
                     .hasRole("ADMIN")
                     .requestMatchers("/api/manager/**")
                     .hasAnyRole("MANAGER", "ADMIN")
                     .requestMatchers("/api/me")
+                    .authenticated()
+                    .requestMatchers(HttpMethod.POST, "/api/bookings")
+                    .hasRole("USER")
+                    .requestMatchers(HttpMethod.POST, "/api/bookings/*/payments")
+                    .hasRole("USER")
+                    .requestMatchers(HttpMethod.GET, "/api/bookings/*/payments")
+                    .authenticated()
+                    .requestMatchers(
+                        HttpMethod.POST,
+                        "/api/mock-payments/*/success",
+                        "/api/mock-payments/*/fail",
+                        "/api/mock-payments/*/cancel")
+                    .authenticated()
+                    .requestMatchers(HttpMethod.GET, "/api/me/bookings", "/api/me/bookings/*")
                     .authenticated()
                     .anyRequest()
                     .denyAll())

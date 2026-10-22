@@ -117,6 +117,16 @@ class IdentityAuthorizationIT {
   }
 
   @Test
+  void serverIssuedSessionWithoutAzpSynchronizesLocalUser() throws Exception {
+    String subject = subject();
+    String token = TestTokens.token(subject, claims -> claims.claim("azp", null));
+    var profile = json.readTree(send("GET", "/api/me", token).body());
+    assertThat(profile.get("clerkUserId").asText()).isEqualTo(subject);
+    assertThat(profile.get("role").asText()).isEqualTo("USER");
+    assertThat(count(subject)).isEqualTo(1);
+  }
+
+  @Test
   void profileChangesKeepIdentityAndOldTokensCannotUndoNewProfileOrRoles() throws Exception {
     String subject = subject();
     Instant now = Instant.now();

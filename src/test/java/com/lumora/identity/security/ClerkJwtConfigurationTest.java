@@ -48,6 +48,22 @@ class ClerkJwtConfigurationTest {
   }
 
   @Test
+  void acceptsServerIssuedSessionWithoutAzpButRejectsUntrustedAzp() {
+    assertThat(
+            decoder
+                .decode(TestTokens.token("user_server", claims -> claims.claim("azp", null)))
+                .getSubject())
+        .isEqualTo("user_server");
+    assertThatThrownBy(
+            () ->
+                decoder.decode(
+                    TestTokens.token(
+                        "user_foreign",
+                        claims -> claims.claim("azp", "https://untrusted.example"))))
+        .isInstanceOf(JwtException.class);
+  }
+
+  @Test
   void rejectsForgedSignatureEvenWithMatchingKeyId() {
     assertThatThrownBy(
             () -> decoder.decode(TestTokens.token("user_forged", claims -> {}, TestTokens.key())))
@@ -112,7 +128,6 @@ class ClerkJwtConfigurationTest {
         claims -> claims.claim("sub", "machine_user"),
         claims -> claims.claim("sid", null),
         claims -> claims.claim("azp", "http://untrusted.example"),
-        claims -> claims.claim("azp", null),
         claims -> claims.claim("sts", "pending"),
         claims -> claims.claim("email", Map.of("unexpected", "object")),
         claims -> claims.claim("first_name", "x".repeat(256)));

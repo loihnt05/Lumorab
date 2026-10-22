@@ -1,23 +1,23 @@
 # Stage 1 — Identity và Authorization cho backend
 
 Stage này triển khai xác thực Clerk JWT, đồng bộ user local, role USER/MANAGER/ADMIN
-và phạm vi quản lý theo property. Không thay đổi frontend. Chưa có Clerk application
-thật ở thời điểm triển khai; đăng nhập Google/Email và kết nối tenant thật cần kiểm
-tra sau khi chủ dự án tạo Clerk application.
+và phạm vi quản lý theo property. Không thay đổi frontend. Từ ngày 16/10/2026,
+development tenant thật đã được kết nối và backend đã xử lý thành công session JWT
+do Clerk phát hành. Đăng nhập trên giao diện sẽ triển khai khi làm frontend.
 
 ## Phạm vi so với implementation plan
 
 | Hạng mục | Trạng thái |
 | --- | --- |
-| P1.1 — Clerk application, Google, Email/Password | Cần chủ dự án tạo/cấu hình tenant |
+| P1.1 — Clerk application, Google, Email/Password | Development tenant đã có; cấu hình công khai xác nhận Google và password là first factors |
 | P1.2 — Clerk provider, login UI, route guard FE | Để sau theo yêu cầu chỉ làm BE |
-| P1.3 — Backend verify Clerk JWT | Đã triển khai, kiểm thử chữ ký và claims |
+| P1.3 — Backend verify Clerk JWT | Đã triển khai, kiểm thử chữ ký/claims và session JWT thật của tenant |
 | P1.4 — Local user synchronization | Đã triển khai, upsert chống trùng và bảo vệ profile mới |
 | P1.5 — Role authorization | Đã triển khai bằng role/status trong PostgreSQL |
 | P1.6 — Manager → Property | Đã triển khai FK, assignment API và kiểm tra quyền ở service |
 
-Không đánh dấu exit gate toàn Stage 1 của cả FE/BE là hoàn tất cho đến khi login
-thật và tích hợp Clerk được xác nhận.
+Exit gate phần BE đã được xác nhận bằng token thật. Exit gate toàn Stage 1 vẫn cần
+kiểm tra thao tác Google/Email trên giao diện khi frontend được triển khai.
 
 ## Kiến trúc
 
@@ -38,7 +38,7 @@ manager/property và kiểm tra scope. `property` mới chứa định danh chi 
 thiểu. Controller xử lý HTTP, service giữ transaction/business rules, repository
 đọc/ghi dữ liệu. PostgreSQL-specific upsert được cô lập trong `UserIdentityWriter`.
 
-## Thiết lập Clerk khi đã tạo application
+## Thiết lập Clerk
 
 1. Tạo Clerk application cho development, bật Google và Email/Password trong cấu
    hình đăng nhập của Clerk. Không lưu business role hoặc property assignment tại Clerk.
@@ -57,20 +57,29 @@ thiểu. Controller xử lý HTTP, service giữ transaction/business rules, rep
    Swagger có nút Authorize cho scheme `clerkBearer`. Không dùng ID token Google,
    Clerk API key hoặc token template thiếu session ID.
 
+Trong workspace hiện tại, `Lumorab/.env` chứa issuer, authorized parties và CORS;
+`Lumoraf/.env.local` chứa publishable/secret key dành cho bước frontend sau này.
+Publishable key khớp với host của issuer; cả hai key thuộc development tenant.
+Backend chỉ cần issuer và JWKS, không đọc secret key Clerk. PostgreSQL local dùng
+`127.0.0.1:55432`; backend đọc đúng cổng này từ `.env` và health trả database UP.
+
 Để trống issuer: app vẫn khởi động, health/Swagger vẫn public, nhưng mọi bearer
 token bị trả 401. Đây là trạng thái mặc định khi chưa có Clerk. Không có profile
 runtime nào bỏ qua xác thực. Issuer đã điền phải dùng HTTPS, không chứa credentials,
 query, fragment hay dấu `/` cuối. Sai cấu hình làm startup thất bại.
 
 Chữ ký chỉ chấp nhận RS256. Bộ kiểm tra yêu cầu issuer đúng, `exp`, `nbf`, `iat`,
-subject `user_*`, session ID `sess_*` và `azp` thuộc allowlist. Có độ lệch đồng hồ
-60 giây cho kiểm tra thời gian. Session `sts=pending` bị từ chối. Lumora yêu cầu
-`azp` có mặt, chặt hơn lựa chọn bỏ qua claim thiếu trong hướng dẫn Clerk.
+subject `user_*`, session ID `sess_*` và `azp` thuộc allowlist nếu claim có mặt.
+Có độ lệch đồng hồ 60 giây cho kiểm tra thời gian. Session `sts=pending` bị từ chối.
+Clerk có thể bỏ `azp` khi token được phát hành qua Backend API không có Origin;
+backend chấp nhận trường hợp đó nhưng vẫn từ chối mọi `azp` không thuộc allowlist.
 Nếu cấu hình audience thì `aud` phải chứa giá trị đó; mặc định không yêu cầu aud.
 
 CORS và `azp` là hai kiểm tra khác nhau: CORS kiểm tra origin của request browser;
-`azp` kiểm tra origin nơi token được phát hành. Request từ curl/Swagger vẫn phải
-mang token có `azp` hợp lệ. Backend không tin các URL `jku`/`x5u` do token tự cung cấp.
+`azp` kiểm tra origin nơi token được phát hành, nếu Clerk đã thêm claim này.
+Token từ curl/Swagger vẫn phải có chữ ký và session claims hợp lệ. Token tạo từ
+Clerk Backend API không có `azp` đã được xác nhận chạy qua `/api/me`. Backend không
+tin các URL `jku`/`x5u` do token tự cung cấp.
 
 Tham chiếu: [Clerk manual verification](https://clerk.com/docs/guides/sessions/manual-jwt-verification)
 và [Spring Security JWT resource server](https://docs.spring.io/spring-security/reference/servlet/oauth2/resource-server/jwt.html).
@@ -206,7 +215,16 @@ PostgreSQL 17 với database test riêng; đã kiểm tra migration V1 → V2 �
 database mới và chạy lại khi schema đã cập nhật. Kết quả này chưa bao gồm xác minh
 đăng nhập với Clerk tenant thật.
 
-Khi có Clerk tenant: bật hai phương thức đăng nhập, điền issuer/origin, kiểm tra
-Google và Email/Password thực tế, dùng session token gọi `/api/me`, promote owner
-đúng subject rồi kiểm tra admin API. Frontend authentication và end-to-end browser
-login sẽ làm ở lượt FE được yêu cầu riêng.
+Kiểm chứng bổ sung ngày 2026-10-16: build Stage 2 cùng phần xác thực đã sửa qua
+42 unit/API tests và 22 integration tests. Backend khởi động từ `.env` trên database
+local, JWKS của tenant trả khóa RS256, Clerk Backend API phát hành session JWT thật,
+và `GET /api/me` với token này trả 200, đồng bộ user local role USER và đúng Clerk
+subject. Session/user thử đã được thu hồi và xóa khỏi Clerk; user local thử cũng đã
+được xóa. Token server-issued có thể thiếu `azp`; các token có `azp` ngoài allowlist
+vẫn bị từ chối.
+
+Development tenant chưa có tài khoản chủ dự án. Khi chủ dự án đăng ký hoặc đăng nhập
+trên Clerk và gọi `/api/me`, backend tạo user local role USER. Sau đó promote đúng
+Clerk subject thành ADMIN bằng câu SQL ở trên rồi thử admin API. Không promote theo
+email hoặc tự động nâng quyền tài khoản đầu tiên. Login Google/Email end-to-end trên
+browser sẽ được kiểm tra ở lượt frontend được yêu cầu riêng.

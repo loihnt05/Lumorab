@@ -26,6 +26,6 @@ public class OpenApiConfig {
             new Info()
                 .title("Lumora API")
                 .version("v1")
-                .description("Lumora identity and property authorization API."));
+                .description("Lumora identity, property authorization and room inventory API."));
   }
 }

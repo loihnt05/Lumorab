@@ -30,6 +30,20 @@ spring:
 server:
   port: ${SERVER_PORT:8080}
 app:
+  booking:
+    hold-duration: ${BOOKING_HOLD_DURATION:15m}
+    zone: ${BOOKING_ZONE:Asia/Ho_Chi_Minh}
+    max-stay-nights: ${BOOKING_MAX_STAY_NIGHTS:365}
+    expiry-enabled: ${BOOKING_EXPIRY_ENABLED:true}
+    expiry-interval: ${BOOKING_EXPIRY_INTERVAL:30s}
+    expiry-batch-size: ${BOOKING_EXPIRY_BATCH_SIZE:100}
+  payment:
+    mock-enabled: ${PAYMENT_MOCK_ENABLED:true}
+  room-codes:
+    enabled: ${ROOM_CODES_ENABLED:true}
+    zone: ${ROOM_CODES_ZONE:Asia/Ho_Chi_Minh}
+    cron: ${ROOM_CODES_CRON:0 0 0 * * *}
+    length: ${ROOM_CODES_LENGTH:6}
   clerk:
     issuer: ${CLERK_ISSUER:}
     authorized-parties: ${CLERK_AUTHORIZED_PARTIES:http://localhost:3000}
