@@ -17,18 +17,33 @@ import org.springframework.web.client.RestTemplate;
 @EnableConfigurationProperties(ClerkProperties.class)
 public class ClerkJwtConfiguration {
   @Bean
-  JwtDecoder jwtDecoder(ClerkProperties properties) {
+  JwtDecoder jwtDecoder(ClerkProperties properties, LocalJwtService localJwtService) {
+    JwtDecoder clerkDecoder;
     if (properties.issuer() == null || properties.issuer().isBlank()) {
       LoggerFactory.getLogger(getClass())
-          .warn("CLERK_ISSUER is not configured; all bearer tokens will be rejected.");
-      return token -> {
-        throw new BadJwtException("Clerk is not configured.");
-      };
+          .warn(
+              "CLERK_ISSUER is not configured; all external clerk bearer tokens will be rejected.");
+      clerkDecoder =
+          token -> {
+            throw new BadJwtException("Clerk is not configured.");
+          };
+    } else {
+      var requestFactory = new SimpleClientHttpRequestFactory();
+      requestFactory.setConnectTimeout(Duration.ofSeconds(3));
+      requestFactory.setReadTimeout(Duration.ofSeconds(3));
+      clerkDecoder = configuredDecoder(properties, new RestTemplate(requestFactory));
     }
-    var requestFactory = new SimpleClientHttpRequestFactory();
-    requestFactory.setConnectTimeout(Duration.ofSeconds(3));
-    requestFactory.setReadTimeout(Duration.ofSeconds(3));
-    return configuredDecoder(properties, new RestTemplate(requestFactory));
+
+    return token -> {
+      if (localJwtService != null && localJwtService.isLocalToken(token)) {
+        return localJwtService.decode(token);
+      }
+      return clerkDecoder.decode(token);
+    };
+  }
+
+  public JwtDecoder jwtDecoder(ClerkProperties properties) {
+    return jwtDecoder(properties, new LocalJwtService(""));
   }
 
   public static NimbusJwtDecoder configuredDecoder(

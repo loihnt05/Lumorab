@@ -6,4 +6,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface UserRepository extends JpaRepository<LocalUser, UUID> {
   Optional<LocalUser> findByClerkUserId(String clerkUserId);
+
+  Optional<LocalUser> findByEmailIgnoreCase(String email);
+
+  boolean existsByEmailIgnoreCase(String email);
 }

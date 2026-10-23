@@ -77,6 +77,8 @@ public class SecurityConfig {
                         "/api/public/availability",
                         "/api/amenities")
                     .permitAll()
+                    .requestMatchers("/api/auth/**")
+                    .permitAll()
                     .requestMatchers(HttpMethod.POST, "/api/webhooks/payments/*")
                     .permitAll()
                     .requestMatchers("/api/admin/**")
